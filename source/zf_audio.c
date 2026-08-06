@@ -137,7 +137,29 @@ static void load_sample(int id1,int id2,const char *path){
   if(g_device)SDL_UnlockAudioDevice(g_device);
   debug_log("audio: loaded ids=%d/%d frames=%u path=%s",id1,id2,(unsigned)frames,path);
 }
-static void play_sample(int id1,int id2,int loop,float volume){Sample *s=sample_for(id1,id2);if(!s){debug_log("audio: play requested before load ids=%d/%d",id1,id2);return;}if(volume<0)volume=0;if(volume>2)volume=2;if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(!g_voices[i].used){g_voices[i]=(Voice){1,s,0,loop!=0,volume};break;}if(g_device)SDL_UnlockAudioDevice(g_device);}
+static void play_sample(int id1,int id2,int loop,float volume){
+  Sample *s=sample_for(id1,id2);
+  if(!s){debug_log("audio: play requested before load ids=%d/%d",id1,id2);return;}
+  if(volume<0)volume=0;
+  if(volume>2)volume=2;
+  if(g_device)SDL_LockAudioDevice(g_device);
+  if(sample_is_music(s)){
+    int existing=-1;
+    for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&sample_is_music(g_voices[i].sample)){
+      if(g_voices[i].sample==s&&existing<0)existing=i;
+      else g_voices[i].used=0;
+    }
+    if(existing>=0){
+      g_voices[existing].volume=volume;g_voices[existing].loop=1;
+      if(g_device)SDL_UnlockAudioDevice(g_device);
+      return;
+    }
+  }
+  for(int i=0;i<MAX_VOICES;i++)if(!g_voices[i].used){
+    g_voices[i]=(Voice){1,s,0,sample_is_music(s)||loop!=0,volume};break;
+  }
+  if(g_device)SDL_UnlockAudioDevice(g_device);
+}
 static void stop_sample(int a,int b){(void)b;if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&g_voices[i].sample->id1==a)g_voices[i].used=0;if(g_device)SDL_UnlockAudioDevice(g_device);}
 static void stop_all(void){if(g_device)SDL_LockAudioDevice(g_device);memset(g_voices,0,sizeof g_voices);if(g_device)SDL_UnlockAudioDevice(g_device);}
 static void stop_type(int music){if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&sample_is_music(g_voices[i].sample)==(music!=0))g_voices[i].used=0;if(g_device)SDL_UnlockAudioDevice(g_device);}
