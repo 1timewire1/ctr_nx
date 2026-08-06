@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="extras/banner.png" alt="Cut the Rope banner" width="35%">
+<img src="extras/banner.png" alt="Cut the Rope banner" width="25%">
 
 </div>
 <h1 align="center">Cut the Rope - Nintendo Switch port</h1>
