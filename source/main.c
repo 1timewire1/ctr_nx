@@ -268,6 +268,15 @@ static void cleanup_apk_extract(void){
 }
 
 static uint64_t now_ns(void){struct timespec ts={0};clock_gettime(CLOCK_MONOTONIC,&ts);return(uint64_t)ts.tv_sec*1000000000ull+(uint64_t)ts.tv_nsec;}
+#define TARGET_FRAME_SECONDS (1.0f/60.0f)
+#define MAX_PHYSICS_FRAME_SECONDS (1.0f/30.0f)
+static float frame_delta(uint64_t now,uint64_t previous){
+  if(now<=previous)return TARGET_FRAME_SECONDS;
+  const float elapsed=(float)(now-previous)/1000000000.0f;
+  /* Loading is synchronous. Never feed the resulting stall into CTR's physics
+   * as one giant step; doing so launches the candy during level transitions. */
+  return elapsed>MAX_PHYSICS_FRAME_SECONDS?TARGET_FRAME_SECONDS:elapsed;
+}
 static void validate_data(void){
   struct stat st;if(stat(GAME_LIBRARY,&st)!=0||!S_ISREG(st.st_mode))fatal_error("Missing %s. Extract both base.apk and split_config.arm64_v8a.apk into %s, merging their folders.",GAME_LIBRARY,GAME_HOME);
   if((long long)st.st_size!=GAME_LIBRARY_SIZE)fatal_error("Unsupported %s (%lld bytes; expected %lld).",GAME_LIBRARY,(long long)st.st_size,(long long)GAME_LIBRARY_SIZE);
@@ -407,7 +416,7 @@ int main(int argc,char **argv){(void)argc;(void)argv;
     }
     uint64_t now=now_ns();
 #if ZF_RENDERER_API == 1
-    float dt=(float)(now-last)/1000000000.0f;if(dt<=0||dt>0.25f)dt=1.0f/60.0f;tick(fake_env,renderer,dt);render(fake_env,renderer);last=now;
+    float dt=frame_delta(now,last);last=now;tick(fake_env,renderer,dt);render(fake_env,renderer);
 #else
     draw(fake_env,renderer,(int64_t)(now/1000000ull));
 #endif

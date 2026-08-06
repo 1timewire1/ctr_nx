@@ -26,6 +26,8 @@ static uint64_t g_movie_read,g_movie_write;
 static int g_movie_active;
 
 static int16_t clamp16(int v){ if(v>32767)return 32767;if(v<-32768)return -32768;return (int16_t)v; }
+/* CTR passes 0 for one-shot effects and a non-zero loop flag for its music. */
+static int sample_is_music(const Sample *sample){return sample&&sample->id2!=0;}
 static void audio_callback(void *opaque, Uint8 *stream, int bytes){
   (void)opaque; int16_t *out=(int16_t *)stream; int frames=bytes/4; memset(stream,0,(size_t)bytes);
   const int movie_active=__atomic_load_n(&g_movie_active,__ATOMIC_ACQUIRE);
@@ -35,7 +37,7 @@ static void audio_callback(void *opaque, Uint8 *stream, int bytes){
   if(movie_available>(uint64_t)frames)movie_available=(uint64_t)frames;
   for(int f=0;f<frames;f++){
     int l=0,r=0;
-    for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used){ Voice *v=&g_voices[i]; if(v->frame>=v->sample->frames){if(v->loop)v->frame=0;else{v->used=0;continue;}} const int16_t *p=v->sample->pcm+v->frame*2; float vol=v->volume*(v->sample->id2==0?g_music_volume:1.0f); l+=(int)(p[0]*vol);r+=(int)(p[1]*vol);v->frame++; }
+    for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used){ Voice *v=&g_voices[i]; if(v->frame>=v->sample->frames){if(v->loop)v->frame=0;else{v->used=0;continue;}} const int16_t *p=v->sample->pcm+v->frame*2; float vol=v->volume*(sample_is_music(v->sample)?g_music_volume:1.0f); l+=(int)(p[0]*vol);r+=(int)(p[1]*vol);v->frame++; }
     if(movie_active&&g_movie_pcm&&(uint64_t)f<movie_available){const int16_t *p=&g_movie_pcm[((movie_read+(uint64_t)f)&(MOVIE_RING_FRAMES-1))*2];l+=p[0];r+=p[1];}
     out[f*2]=clamp16(l);out[f*2+1]=clamp16(r);
   }
@@ -138,7 +140,7 @@ static void load_sample(int id1,int id2,const char *path){
 static void play_sample(int id1,int id2,int loop,float volume){Sample *s=sample_for(id1,id2);if(!s){debug_log("audio: play requested before load ids=%d/%d",id1,id2);return;}if(volume<0)volume=0;if(volume>2)volume=2;if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(!g_voices[i].used){g_voices[i]=(Voice){1,s,0,loop!=0,volume};break;}if(g_device)SDL_UnlockAudioDevice(g_device);}
 static void stop_sample(int a,int b){(void)b;if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&g_voices[i].sample->id1==a)g_voices[i].used=0;if(g_device)SDL_UnlockAudioDevice(g_device);}
 static void stop_all(void){if(g_device)SDL_LockAudioDevice(g_device);memset(g_voices,0,sizeof g_voices);if(g_device)SDL_UnlockAudioDevice(g_device);}
-static void stop_type(int music){if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&((g_voices[i].sample->id2==0)==music))g_voices[i].used=0;if(g_device)SDL_UnlockAudioDevice(g_device);}
+static void stop_type(int music){if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&sample_is_music(g_voices[i].sample)==(music!=0))g_voices[i].used=0;if(g_device)SDL_UnlockAudioDevice(g_device);}
 static void set_volume(int id,float vol){if(vol<0)vol=0;if(vol>2)vol=2;if(g_device)SDL_LockAudioDevice(g_device);for(int i=0;i<MAX_VOICES;i++)if(g_voices[i].used&&g_voices[i].sample->id1==id)g_voices[i].volume=vol;if(g_device)SDL_UnlockAudioDevice(g_device);}
 
 int zf_audio_handles(const char *cls,const char *name){
