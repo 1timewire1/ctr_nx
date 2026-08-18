@@ -360,7 +360,7 @@ int main(int argc,char **argv){(void)argc;(void)argv;
   startup_status_begin("Preparing " GAME_TITLE);
   if(chdir(GAME_HOME)!=0)fatal_error("Could not open %s. Put the NRO and extracted APK files in that folder.",GAME_HOME);
   debug_init();debug_log("boot: application start");check_syscalls();
-  int cfg=read_config(GAME_HOME "/" CONFIG_NAME);if(cfg!=0)write_config(GAME_HOME "/" CONFIG_NAME);if(config.portrait!=1&&config.portrait!=2)config.portrait=DEFAULT_PORTRAIT;
+  int cfg = read_config(GAME_HOME "/" CONFIG_NAME); if (cfg != 0) write_config(GAME_HOME "/" CONFIG_NAME); /* Allow portrait values: 0=landscape, 1=ROT_90, 2=ROT_270. Clamp out-of-range values to the default. */ if (config.portrait < 0 || config.portrait > 2) config.portrait = DEFAULT_PORTRAIT;
   const int first_boot=apk_extract_present();
   if(first_boot)startup_status_update("Preparing extracted APK (first boot)...");
   prepare_extracted_apk();
